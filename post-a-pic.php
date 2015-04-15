@@ -5,12 +5,28 @@
     Plugin URI:
     Description: Provides the facility to automatically create a post when an image is uploaded to the Wordpress media gallery. The uploaded image can become the post's feature image and some meta data (such as EXIF data), or the image itself, can automatically be set in post's content. Post date can be set according to the image. Inspired by Auto Post After Image Upload, https://wordpress.org/plugins/auto-post-after-image-upload/
     Author: Starnuto di topo
-    Version: 1.0
+    Version: 1.1
     Author URI: 
 */
 
 class PostAPic
-{    
+{
+    function write_Table_Header(){
+        return '<table style="border:1px solid #cccccc;"><caption>Picture properties</caption><tbody>';
+    }
+
+    function write_Table_Line($key, $value){
+        //return $key . ' ' . $value . "<br />";
+        return '<tr>'
+            . '<td>' . $key . '</td>'
+            . '<td>' . $value . '</td>'
+            . '</tr>';
+    }
+
+    function write_Table_Footer(){
+        return '</tbody></table>';
+    }
+
     /**
      * Returns an array of latitude and longitude from the Image file
      * @param image $file
@@ -19,10 +35,16 @@ class PostAPic
      //See: http://stackoverflow.com/a/19420991/1288109
     function read_gps_location($file){
         if (is_file($file)) {
-            $info = exif_read_data($file);
-            if (isset($info['GPSLatitude']) && isset($info['GPSLongitude']) &&
-                isset($info['GPSLatitudeRef']) && isset($info['GPSLongitudeRef']) &&
-                in_array($info['GPSLatitudeRef'], array('E','W','N','S')) && in_array($info['GPSLongitudeRef'], array('E','W','N','S'))) {
+            $info = @read_exif_data($file);
+
+            if (
+                (@array_key_exists('GPSLatitude', $info))
+                && (@array_key_exists('GPSLongitude', $info))
+                && (@array_key_exists('GPSLatitudeRef', $info))
+                && (@array_key_exists('GPSLongitudeRef', $info))
+                && in_array($info['GPSLatitudeRef'], array('E','W','N','S'))
+                && in_array($info['GPSLongitudeRef'], array('E','W','N','S'))
+                ) {
 
                 $GPSLatitudeRef  = strtolower(trim($info['GPSLatitudeRef']));
                 $GPSLongitudeRef = strtolower(trim($info['GPSLongitudeRef']));
@@ -83,6 +105,8 @@ class PostAPic
             $result = $result . $image_tag;
         }
 
+        $result = $result . $this->write_Table_Header();
+
         $imagePath = get_attached_file($attachId, true);
 
         $exif_general = @read_exif_data($imagePath);
@@ -92,13 +116,13 @@ class PostAPic
             // Image Description
             if (@array_key_exists('ImageDescription', $exif_general))
             {
-                $result = $result . "Image description: " . $exif_general['ImageDescription'] . "<br />";
+                $result = $result . $this->write_Table_Line("Image description:",  $exif_general['ImageDescription']);
             }
 
             // Date
             if (@array_key_exists('DateTime', $exif_general))
             {
-                $result = $result . "Date taken: " . $exif_general['DateTime'] . "<br />";
+                $result = $result . $this->write_Table_Line("Date taken:",  $exif_general['DateTime']);
             }
         }
 
@@ -109,20 +133,20 @@ class PostAPic
                 // Make
                 if (@array_key_exists('Make', $exif_ifd0))
                 {
-                    $result = $result . "Camera maker: " . $exif_ifd0['Make'] . "<br />";
+                    $result = $result . $this->write_Table_Line("Camera maker:",  $exif_ifd0['Make']);
                 }
 
                 // Model
                 if (@array_key_exists('Model', $exif_ifd0))
                 {
-                    $result = $result . "Camera model: " . $exif_ifd0['Model'] . "<br />";
+                    $result = $result . $this->write_Table_Line("Camera model:",  $exif_ifd0['Model']);
                 }
-
-                // Exposure
-                if (@array_key_exists('ExposureTime', $exif_ifd0))
-                {
-                    $result = $result . "Exposure time: " . $exif_ifd0['ExposureTime'] . "<br />";
-                }
+                
+                //// Exposure time
+                //if (@array_key_exists('ExposureTime', $exif_ifd0))
+                //{
+                //    $result = $result . $this->write_Table_Line("Exposure time:",  $exif_ifd0['ExposureTime']);
+                //}
 
                 if (@array_key_exists('COMPUTED', $exif_ifd0))
                 {
@@ -130,13 +154,13 @@ class PostAPic
                     // Aperture
                     if (@array_key_exists('ApertureFNumber', $computed))
                     {
-                        $result = $result . "Aperture: " . $computed['ApertureFNumber'] . "<br />";
+                        $result = $result . $this->write_Table_Line("Aperture:",  $computed['ApertureFNumber']);
                     }
 
                     // CCD width
-                    if (@array_key_exists('CCDWidth',$exif_ifd0))
+                    if (@array_key_exists('CCDWidth', $exif_ifd0))
                     {
-                        $result = $result . "CCD width: " . $exif_ifd0['CCDWidth'] . "<br />";
+                        $result = $result . $this->write_Table_Line("CCD width:",  $exif_ifd0['CCDWidth']);
                     }
                 }
             }
@@ -146,63 +170,65 @@ class PostAPic
 
             if (@array_key_exists('ExposureTime', $exif_general))
             {
-                $result = $result . "Exposure time: " . $exif_general['ExposureTime'] . "<br />";
+                $result = $result . $this->write_Table_Line("Exposure time:",  $exif_general['ExposureTime']);
             }
             if (@array_key_exists('FNumber', $exif_general))
             {
-                $result = $result . "Focal ratio: " . $exif_general['FNumber'] . "<br />";
+                $result = $result . $this->write_Table_Line("Focal ratio:",  $exif_general['FNumber']);
             }
             if (@array_key_exists('ExifVersion', $exif_general))
             {
-                $result = $result . "Exif version: " . $exif_general['ExifVersion'] . "<br />";
+                $result = $result . $this->write_Table_Line("Exif version:",  $exif_general['ExifVersion']);
             }
             if (@array_key_exists('ShutterSpeedValue', $exif_general))
             {
-                $result = $result . "Shutter speed value: " . $exif_general['ShutterSpeedValue'] . "<br />";
+                $result = $result . $this->write_Table_Line("Shutter speed value:",  $exif_general['ShutterSpeedValue']);
             }
             if (@array_key_exists('ApertureValue', $exif_general))
             {
-                $result = $result . "Aperture value: " . $exif_general['ApertureValue'] . "<br />";
+                $result = $result . $this->write_Table_Line("Aperture value:",  $exif_general['ApertureValue']);
             }
             if (@array_key_exists('ExposureBiasValue', $exif_general))
             {
-                $result = $result . "Exposure bias value: " . $exif_general['ExposureBiasValue'] . "<br />";
+                $result = $result . $this->write_Table_Line("Exposure bias value:",  $exif_general['ExposureBiasValue']);
             }
             if (@array_key_exists('MaxApertureValue', $exif_general))
             {
-                $result = $result . "Max aperture value: " . $exif_general['MaxApertureValue'] . "<br />";
+                $result = $result . $this->write_Table_Line("Max aperture value:",  $exif_general['MaxApertureValue']);
             }
             if (@array_key_exists('MeteringMode', $exif_general))
             {
-                $result = $result . "Metering mode: " . $exif_general['MeteringMode'] . "<br />";
+                $result = $result . $this->write_Table_Line("Metering mode:",  $exif_general['MeteringMode']);
             }
             if (@array_key_exists('Flash', $exif_general))
             {
-                $result = $result . "Flash: " . $exif_general['Flash'] . "<br />";
+                $result = $result . $this->write_Table_Line("Flash:",  $exif_general['Flash']);
             }
             if (@array_key_exists('FocalLength', $exif_general))
             {
-                $result = $result . "Focal length: " . $exif_general['FocalLength'] . "<br />";
+                $result = $result . $this->write_Table_Line("Focal length:",  $exif_general['FocalLength']);
             }
             if (@array_key_exists('DigitalZoomRatio', $exif_general))
             {
-                $result = $result . "Digital zoom ratio: " . $exif_general['DigitalZoomRatio'] . "<br />";
+                $result = $result . $this->write_Table_Line("Digital zoom ratio:",  $exif_general['DigitalZoomRatio']);
             }
 
             if (@array_key_exists('SceneCaptureType', $exif_general))
             {
                 // See: http://www.awaresystems.be/imaging/tiff/tifftags/privateifd/exif/scenecapturetype.html
-                $result = $result . "Scene capture type: ";
+                $SceneCaptureType = "";
                 $type = $exif_general['SceneCaptureType'];
                 if($type == 0){
-                    $result = $result . "Standard ". "<br />";
+                    $SceneCaptureType = "Standard";
                 } else if($type == 1){
-                    $result = $result . "Landscape ". "<br />";
+                    $SceneCaptureType =  "Landscape";
                 } else if($type == 1){
-                    $result = $result . "Portrait ". "<br />";
+                    $SceneCaptureType =  "Portrait";
                 } else if($type == 1){
-                    $result = $result . "Night scene ". "<br />";
+                    $SceneCaptureType =  "Night scene";
                 }
+
+                $result = $result . $this->write_Table_Line("Scene capture type:",  $SceneCaptureType);
             }        
 
             $exif_exif = @read_exif_data($imagePath ,'EXIF' ,0);
@@ -211,20 +237,57 @@ class PostAPic
                 // ISO
                 if (@array_key_exists('ISOSpeedRatings',$exif_exif))
                 {
-                    $result = $result . "ISO speed: " . $exif_exif['ISOSpeedRatings'] . "<br />";
+                    $result = $result . $this->write_Table_Line("ISO speed:",  $exif_exif['ISOSpeedRatings']);
                 }
             }
         }
 
+        $gpsLocation = $this->read_gps_location($imagePath);            
         if($options['addGpsLocation']){
-            $gpsLocation = $this->read_gps_location($imagePath);
             if($gpsLocation !== false){
-                $result = $result
-                    . "GPS lat: " . $gpsLocation['lat'] . "<br />"
-                    . "GPS lon: " . $gpsLocation['lng'] . "<br />";                
-            }
+                $result = $result . $this->write_Table_Line("GPS lat:",  $gpsLocation['lat']);
+                $result = $result . $this->write_Table_Line("GPS lon:",  $gpsLocation['lng']);
+            }            
         }
 
+        $result = $result . $this->write_Table_Footer();
+
+        if($options['includeGoogleMap']){
+            if($gpsLocation !== false){
+                // See: http://www.w3schools.com/googleapi/google_maps_basic.asp
+                $result = $result .'<script>
+                 function postAPic_InitializeGoogleMaps() {
+                     var mapProp = {
+                         center: new google.maps.LatLng('.$gpsLocation['lat'] . ',' . $gpsLocation['lng'] . '),
+                         zoom: 12,
+                         mapTypeId: google.maps.MapTypeId.ROADMAP
+                     };
+                     var map = new google.maps.Map(document.getElementById("postAPic_googleMapDiv"),mapProp);
+                     var marker = new google.maps.Marker({
+                         position: new google.maps.LatLng('.$gpsLocation['lat'] . ',' . $gpsLocation['lng'] . '),
+                     });
+                     marker.setMap(map);
+                 }
+                 function postAPic_LoadGoogleMapsScript() {
+                    var alreadyRegistered = false;
+                    if (typeof google === "object"){
+                        if (typeof google.maps === "object"){
+                            alreadyRegistered = true;
+                        }
+                    }
+                    if (alreadyRegistered){
+                        postAPic_InitializeGoogleMaps();
+                    } else {
+                        var script = document.createElement("script");
+                        script.src = "http://maps.googleapis.com/maps/api/js?callback=postAPic_InitializeGoogleMaps";
+                        document.body.appendChild(script);
+                    }
+                 }
+                 window.onload = postAPic_LoadGoogleMapsScript;
+                 </script>
+                 <div id="postAPic_googleMapDiv" style="width:500px;height:380px;"></div>';
+            }
+        }
         return $result;    
     }
 
@@ -235,7 +298,8 @@ class PostAPic
             'addCameraInfo'      => true,
             'includeImageInPost' => true,
             'addImageInfo'       => true,
-            'setPostDate'        => true
+            'setPostDate'        => true,
+            'includeGoogleMap'   => true
         );
         $options = get_option('post_a_pic_plugin_options_general', $defaultOptions);
         $options = array_merge($defaultOptions, $options);
@@ -320,6 +384,7 @@ class PostAPic
         add_settings_field('includeImageInPost', 'Include image in post', array( $this,'printIncludeImageInPostString'), 'pluginPage', 'generalSectionId');
         add_settings_field('addImageInfo', 'Add image information', array( $this,'printAddImageInfoString'), 'pluginPage', 'generalSectionId');
         add_settings_field('setPostDate', 'Set post time according to image time', array( $this,'printSetPostDateString'), 'pluginPage', 'generalSectionId');
+        add_settings_field('includeGoogleMap', 'Include Google map', array( $this,'printIncludeGoogleMapString'), 'pluginPage', 'generalSectionId');
     }
 
     function general_section_text() {
@@ -374,6 +439,14 @@ class PostAPic
         echo " />";
     }
 
+    function printIncludeGoogleMapString() {
+        $options = $this->getCurrentOptions();
+
+        echo "<input id='includeGoogleMap' name='post_a_pic_plugin_options_general[includeGoogleMap]' type='checkbox' value='1' ";
+        checked( $options['includeGoogleMap'] );
+        echo " />";
+    }
+
     function post_a_pic_plugin_options_general_validate($input) {
         $options = $this->getCurrentOptions();
         $options['featuredImage'] = $input['featuredImage'];
@@ -382,13 +455,27 @@ class PostAPic
         $options['includeImageInPost'] = $input['includeImageInPost'];
         $options['addImageInfo'] = $input['addImageInfo'];
         $options['setPostDate'] = $input['setPostDate'];
+        $options['includeGoogleMap'] = $input['includeGoogleMap'];
         return $options;
     }
 }
 
 function post_a_pic_add_attachment($attachId){
-    $pap = new PostAPic();
-    return $pap->post_a_pic($attachId);
+	try{
+		$pap = new PostAPic();
+		return $pap->post_a_pic($attachId);
+	}
+	catch(Exception $e)
+	{
+		// Define the settings error to display
+      add_settings_error(
+        'Error',
+        '',
+        $e->getMessage(),
+        'error'
+      );
+	}
+	return NULL;
 }
 add_action('add_attachment', 'post_a_pic_add_attachment');
 
@@ -406,30 +493,6 @@ add_action('admin_menu', 'post_a_pic_admin_add_page');
 
 
 /*
-
-TODO:
-    output table;
-    see: https://wpbtips.wordpress.com/2013/04/09/table-coding-for-wordpress-com-users/
-    sample html table:
-
-<table style="border:1px solid #cccccc;">
-    <caption>Picture properties</caption>
-    <tbody>
-        <tr>
-            <td>ROW1 COL1 CONTENT</td>
-            <td>ROW1 COL2 CONTENT</td>
-        </tr>
-        <tr>
-            <td>ROW2 COL1 CONTENT</td>
-            <td>ROW2 COL2 CONTENT</td>
-        </tr>
-        <tr>
-            <td>ROW3 COL1 CONTENT</td>
-            <td>ROW3 COL2 CONTENT</td>
-        </tr>
-    </tbody>
-</table>
-
 
 See: https://developers.google.com/maps/documentation/embed/guide
 
