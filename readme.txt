@@ -13,7 +13,8 @@ Let you create single/bulk post after uploading any media from wordpress media g
 == Description ==
 
 Provides the facility to automatically create a post when an image is uploaded to the Wordpress media gallery.
-The uploaded image can becomes the post's feature image and some information about the image (such as EXIF data), or the image itself, can automatically be set in post's content.
+The uploaded image can become the post's feature image and some information about the image (such as EXIF data), or the image itself, can automatically be set in post's content.
+If GPS location, a Google map displaying the image location can be added as well.
 Useful for photo blog or where there is a large number of image posting in a wordpress driven site.
 Inspired by Auto Post After Image Upload, https://wordpress.org/plugins/auto-post-after-image-upload/
 
