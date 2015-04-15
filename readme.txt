@@ -47,3 +47,14 @@ There is no Screenshot yet!
 
 = 1.0 =
 * Initial release
+= 1.1 =
+* Bug fixes in case of missing GPS coordinates
+* Showing properties in a table
+* Added capability to display Google map
+
+== Upgrade Notice ==
+
+= 1.1 =
+
+* Bug fixes in case of missing GPS coordinates
+* Enhancements
