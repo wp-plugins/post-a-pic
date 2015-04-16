@@ -490,7 +490,7 @@ class PostAPic
 
         $categoryOptions = trim($options['setCategory']);
         if(! empty($categoryOptions)){
-            $categories = explode(',', $options['setCategory']);
+            $categories = explode(',', $categoryOptions);
             $trimmedCategories = array_map('trim', $categories);
             wp_set_object_terms( $post_id, $trimmedCategories, 'category', false);
         }
