@@ -3,19 +3,36 @@
 /*
     Plugin Name: Post-a-pic
     Plugin URI:
-    Description: Provides the facility to automatically create a post when an image is uploaded to the Wordpress media gallery. The uploaded image can become the post's feature image and some meta data (such as EXIF data), or the image itself, can automatically be set in post's content. Post date can be set according to the image. Inspired by Auto Post After Image Upload, https://wordpress.org/plugins/auto-post-after-image-upload/
+    Description: Provides the facility to automatically create a post when an image is uploaded to the Wordpress media gallery.
     Author: Starnuto di topo
-    Version: 1.1
+    Version: 1.2
     Author URI: 
 */
 
 class PostAPic
 {
+    private $tableLinesCount;
+    function __construct (){        
+        $this->tableLinesCount = 0;
+    }
+
+    function fractionToNumber($stringValue){
+         $values = explode('/', $stringValue);
+         if(count($values) == 1){
+             return $values[0];
+         } else if(count($values) == 2){
+            return $values[0] / $values[1];
+         }
+         return NULL;
+    }
+
     function write_Table_Header(){
-        return '<table style="border:1px solid #cccccc;"><caption>Picture properties</caption><tbody>';
+        return '<table style="border:1px solid #cccccc;"><caption>Image details</caption><tbody>';
     }
 
     function write_Table_Line($key, $value){
+        $this->tableLinesCount ++;
+
         //return $key . ' ' . $value . "<br />";
         return '<tr>'
             . '<td>' . $key . '</td>'
@@ -92,6 +109,88 @@ class PostAPic
         return $result;
     }
 
+    // Method inspired from Jean-Sebastien Morisset,  http://surniaulula.com/
+	function get_xmp_raw( $filepath ) {
+		//$max_size = 512000;	// maximum size read
+		$chunk_size = 65536;	// read 64k at a time
+		$start_tag = '<x:xmpmeta';
+		$end_tag = '</x:xmpmeta>';
+		$xmp_raw = null; 
+		if ( $file_fh = fopen( $filepath, 'rb' ) ) {
+			$chunk = '';
+			$file_size = filesize( $filepath );
+			//while ( ( $file_pos = ftell( $file_fh ) ) < $file_size  && $file_pos < $max_size ) {
+            while ( ( $file_pos = ftell( $file_fh ) ) < $file_size ) {
+				$chunk .= fread( $file_fh, $chunk_size );
+				if ( ( $end_pos = strpos( $chunk, $end_tag ) ) !== false ) {
+					if ( ( $start_pos = strpos( $chunk, $start_tag ) ) !== false ) {
+						$xmp_raw = substr( $chunk, $start_pos, $end_pos - $start_pos + strlen( $end_tag ) );							
+					}
+					break;	// stop reading after finding the xmp data
+				}
+			}
+			fclose( $file_fh );
+		}
+		return $xmp_raw;
+	}
+
+    // Method inspired from https://github.com/wp-plugins/adobe-xmp-for-wp/blob/master/adobe-xmp-for-wp.php
+    function get_xmp_array( &$xmp_raw ) {
+		$xmp_arr = array();
+		foreach ( array(
+			'Creator Email'	=> '<Iptc4xmpCore:CreatorContactInfo[^>]+?CiEmailWork="([^"]*)"',
+			'Owner Name'	=> '<rdf:Description[^>]+?aux:OwnerName="([^"]*)"',
+			'Creation Date'	=> '<rdf:Description[^>]+?xmp:CreateDate="([^"]*)"',
+			'Modification Date'	=> '<rdf:Description[^>]+?xmp:ModifyDate="([^"]*)"',
+			'Label'		=> '<rdf:Description[^>]+?xmp:Label="([^"]*)"',
+			'Credit'	=> '<rdf:Description[^>]+?photoshop:Credit="([^"]*)"',
+			'Source'	=> '<rdf:Description[^>]+?photoshop:Source="([^"]*)"',
+			'Headline'	=> '<rdf:Description[^>]+?photoshop:Headline="([^"]*)"',
+			'City'		=> '<rdf:Description[^>]+?photoshop:City="([^"]*)"',
+			'State'		=> '<rdf:Description[^>]+?photoshop:State="([^"]*)"',
+			'Country'	=> '<rdf:Description[^>]+?photoshop:Country="([^"]*)"',
+			'Country Code'	=> '<rdf:Description[^>]+?Iptc4xmpCore:CountryCode="([^"]*)"',
+			'Location'	=> '<rdf:Description[^>]+?Iptc4xmpCore:Location="([^"]*)"',
+			'Title'		=> '<dc:title>\s*<rdf:Alt>\s*(.*?)\s*<\/rdf:Alt>\s*<\/dc:title>',
+			'Description'	=> '<dc:description>\s*<rdf:Alt>\s*(.*?)\s*<\/rdf:Alt>\s*<\/dc:description>',
+			'Creator'	=> '<dc:creator>\s*<rdf:Seq>\s*(.*?)\s*<\/rdf:Seq>\s*<\/dc:creator>',
+			'Keywords'	=> '<dc:subject>\s*<rdf:Bag>\s*(.*?)\s*<\/rdf:Bag>\s*<\/dc:subject>',
+			'Hierarchical Keywords'	=> '<lr:hierarchicalSubject>\s*<rdf:Bag>\s*(.*?)\s*<\/rdf:Bag>\s*<\/lr:hierarchicalSubject>'
+		) as $key => $regex ) {
+			// get a single text string
+			$xmp_arr[$key] = preg_match( "/$regex/is", $xmp_raw, $match ) ? $match[1] : '';
+			// if string contains a list, then re-assign the variable as an array with the list elements
+			$xmp_arr[$key] = preg_match_all( "/<rdf:li[^>]*>([^>]*)<\/rdf:li>/is", $xmp_arr[$key], $match ) ? $match[1] : $xmp_arr[$key];
+			// hierarchical keywords need to be split into a third dimension
+			if ( ! empty( $xmp_arr[$key] ) && $key == 'Hierarchical Keywords' ) {
+				foreach ( $xmp_arr[$key] as $li => $val ) $xmp_arr[$key][$li] = explode( '|', $val );
+				unset ( $li, $val );
+			}
+		}
+		return $xmp_arr;
+	}
+
+    function getXmpKeywords($imagePath){
+        $keywords = array();
+
+        $xmp_raw = $this-> get_xmp_raw( $imagePath );
+        if ( ! empty( $xmp_raw ) ){
+            $xmp = $this->get_xmp_array( $xmp_raw );
+            if (@array_key_exists('Keywords', $xmp)){
+                if(is_array($xmp['Keywords']) )
+                {
+                    $keywordsArray = $xmp['Keywords'];
+                    $arrlength = count($keywordsArray);
+                    for($x = 0; $x < $arrlength; $x++) {
+                        $keyword = $keywordsArray[$x];
+                        array_push($keywords, $keyword);
+                    }
+                }
+            }            
+        }
+        return $keywords;
+    }
+
     function makePostContent($attachId, $options){
         $result = "";
 
@@ -105,7 +204,7 @@ class PostAPic
             $result = $result . $image_tag;
         }
 
-        $result = $result . $this->write_Table_Header();
+        $tableContent = "";
 
         $imagePath = get_attached_file($attachId, true);
 
@@ -116,120 +215,157 @@ class PostAPic
             // Image Description
             if (@array_key_exists('ImageDescription', $exif_general))
             {
-                $result = $result . $this->write_Table_Line("Image description:",  $exif_general['ImageDescription']);
+                $description = trim($exif_general['ImageDescription']);
+                if(!empty ($description)){
+                    $tableContent = $tableContent . $this->write_Table_Line("Image description:", $description );
+                }
             }
 
             // Date
             if (@array_key_exists('DateTime', $exif_general))
             {
-                $result = $result . $this->write_Table_Line("Date taken:",  $exif_general['DateTime']);
+                $tableContent = $tableContent . $this->write_Table_Line("Date taken:",  $exif_general['DateTime']);
             }
-        }
+        }       
 
         if($options['addCameraInfo']){
             $exif_ifd0 = @read_exif_data($imagePath ,'IFD0' ,0);
-            if ($exif_ifd0 !== false)
-            {
-                // Make
-                if (@array_key_exists('Make', $exif_ifd0))
-                {
-                    $result = $result . $this->write_Table_Line("Camera maker:",  $exif_ifd0['Make']);
-                }
-
-                // Model
-                if (@array_key_exists('Model', $exif_ifd0))
-                {
-                    $result = $result . $this->write_Table_Line("Camera model:",  $exif_ifd0['Model']);
-                }
-                
-                //// Exposure time
-                //if (@array_key_exists('ExposureTime', $exif_ifd0))
+            if ($exif_ifd0 !== false) {
+                // maker and model unified
+                //// Make
+                //if (@array_key_exists('Make', $exif_ifd0))
                 //{
-                //    $result = $result . $this->write_Table_Line("Exposure time:",  $exif_ifd0['ExposureTime']);
+                //    $tableContent = $tableContent . $this->write_Table_Line("Camera maker:",  $exif_ifd0['Make']);
                 //}
 
-                if (@array_key_exists('COMPUTED', $exif_ifd0))
+                //// Model
+                //if (@array_key_exists('Model', $exif_ifd0))
+                //{
+                //    $tableContent = $tableContent . $this->write_Table_Line("Camera model:",  $exif_ifd0['Model']);
+                //}
+
+                // Camera info
                 {
-                    $computed = $exif_ifd0['COMPUTED'];
-                    // Aperture
-                    if (@array_key_exists('ApertureFNumber', $computed))
+                    $cameraInfo = array();
+
+                    // Make
+                    if (@array_key_exists('Make', $exif_ifd0))
                     {
-                        $result = $result . $this->write_Table_Line("Aperture:",  $computed['ApertureFNumber']);
+                        array_push($cameraInfo,  $exif_ifd0['Make']);
                     }
 
-                    // CCD width
-                    if (@array_key_exists('CCDWidth', $exif_ifd0))
-                    {
-                        $result = $result . $this->write_Table_Line("CCD width:",  $exif_ifd0['CCDWidth']);
+                    // Model
+                    if (@array_key_exists('Model', $exif_ifd0))
+                    {                        
+                        array_push($cameraInfo,  $exif_ifd0['Model']);
+                    }
+                    if(!empty($cameraInfo)){
+                        $tableContent = $tableContent . $this->write_Table_Line("Camera:",  implode(' ', $cameraInfo));
                     }
                 }
+                
+                //// Exposure time (already read somewhere else)
+                //if (@array_key_exists('ExposureTime', $exif_ifd0))
+                //{
+                //    $tableContent = $tableContent . $this->write_Table_Line("Exposure time:",  $exif_ifd0['ExposureTime']);
+                //}
+
+                // Irrelevant
+                //if (@array_key_exists('COMPUTED', $exif_ifd0))
+                //{
+                //    $computed = $exif_ifd0['COMPUTED'];
+                //    // Aperture
+                //    if (@array_key_exists('ApertureFNumber', $computed))
+                //    {
+                //        $tableContent = $tableContent . $this->write_Table_Line("Aperture:",  $computed['ApertureFNumber']);
+                //    }
+
+                //    // CCD width
+                //    if (@array_key_exists('CCDWidth', $exif_ifd0))
+                //    {
+                //        $tableContent = $tableContent . $this->write_Table_Line("CCD width:",  $exif_ifd0['CCDWidth']);
+                //    }
+                //}
             }
 
-
-            // -----------------------
 
             if (@array_key_exists('ExposureTime', $exif_general))
             {
-                $result = $result . $this->write_Table_Line("Exposure time:",  $exif_general['ExposureTime']);
+                $tableContent = $tableContent . $this->write_Table_Line("Exposure time:", $this->fractionToNumber($exif_general['ExposureTime']) . ' s');
             }
             if (@array_key_exists('FNumber', $exif_general))
             {
-                $result = $result . $this->write_Table_Line("Focal ratio:",  $exif_general['FNumber']);
+                $tableContent = $tableContent . $this->write_Table_Line("Focal stop:", 'f/' . $this->fractionToNumber($exif_general['FNumber']));
             }
-            if (@array_key_exists('ExifVersion', $exif_general))
-            {
-                $result = $result . $this->write_Table_Line("Exif version:",  $exif_general['ExifVersion']);
-            }
-            if (@array_key_exists('ShutterSpeedValue', $exif_general))
-            {
-                $result = $result . $this->write_Table_Line("Shutter speed value:",  $exif_general['ShutterSpeedValue']);
-            }
-            if (@array_key_exists('ApertureValue', $exif_general))
-            {
-                $result = $result . $this->write_Table_Line("Aperture value:",  $exif_general['ApertureValue']);
-            }
+
+            // irrelevant
+            //if (@array_key_exists('ExifVersion', $exif_general))
+            //{
+            //    $tableContent = $tableContent . $this->write_Table_Line("Exif version:",  $exif_general['ExifVersion']);
+            //}
+            // irrelevant
+            //if (@array_key_exists('ShutterSpeedValue', $exif_general))
+            //{
+            //    $tableContent = $tableContent . $this->write_Table_Line("Shutter speed value:",  $this->fractionToNumber($exif_general['ShutterSpeedValue']) . ' s');
+            //}
+            // irrelevant
+            // if (@array_key_exists('ApertureValue', $exif_general))
+            // {
+            //    $tableContent = $tableContent . $this->write_Table_Line("Aperture value:",  $exif_general['ApertureValue']);
+            // }
             if (@array_key_exists('ExposureBiasValue', $exif_general))
             {
-                $result = $result . $this->write_Table_Line("Exposure bias value:",  $exif_general['ExposureBiasValue']);
+                $tableContent = $tableContent . $this->write_Table_Line("Exposure bias:", $this->fractionToNumber($exif_general['ExposureBiasValue']) . ' EV' );
             }
-            if (@array_key_exists('MaxApertureValue', $exif_general))
-            {
-                $result = $result . $this->write_Table_Line("Max aperture value:",  $exif_general['MaxApertureValue']);
-            }
-            if (@array_key_exists('MeteringMode', $exif_general))
-            {
-                $result = $result . $this->write_Table_Line("Metering mode:",  $exif_general['MeteringMode']);
-            }
+
+            // irrelevant
+            //if (@array_key_exists('MaxApertureValue', $exif_general))
+            //{
+            //    $tableContent = $tableContent . $this->write_Table_Line("Max aperture value:",  $this->fractionToNumber($exif_general['MaxApertureValue']));
+            //}
+
+            // irrelevant
+            //if (@array_key_exists('MeteringMode', $exif_general))
+            //{
+            //    $tableContent = $tableContent . $this->write_Table_Line("Metering mode:",  $exif_general['MeteringMode']);
+            //}
+
             if (@array_key_exists('Flash', $exif_general))
             {
-                $result = $result . $this->write_Table_Line("Flash:",  $exif_general['Flash']);
+                $flashFired = 'no';
+                if( ($exif_general['Flash'] & 1) != 0)
+                {
+                    $flashFired = 'yes';
+                }
+                $tableContent = $tableContent . $this->write_Table_Line("Flash:",  $flashFired);
             }
             if (@array_key_exists('FocalLength', $exif_general))
             {
-                $result = $result . $this->write_Table_Line("Focal length:",  $exif_general['FocalLength']);
+                $tableContent = $tableContent . $this->write_Table_Line("Focal length:", $this->fractionToNumber($exif_general['FocalLength']) . ' mm' );
             }
-            if (@array_key_exists('DigitalZoomRatio', $exif_general))
-            {
-                $result = $result . $this->write_Table_Line("Digital zoom ratio:",  $exif_general['DigitalZoomRatio']);
-            }
+            // irrelevant
+            // if (@array_key_exists('DigitalZoomRatio', $exif_general))
+            // {
+            //    $tableContent = $tableContent . $this->write_Table_Line("Digital zoom ratio:",  $exif_general['DigitalZoomRatio']);
+            // }
 
-            if (@array_key_exists('SceneCaptureType', $exif_general))
-            {
-                // See: http://www.awaresystems.be/imaging/tiff/tifftags/privateifd/exif/scenecapturetype.html
-                $SceneCaptureType = "";
-                $type = $exif_general['SceneCaptureType'];
-                if($type == 0){
-                    $SceneCaptureType = "Standard";
-                } else if($type == 1){
-                    $SceneCaptureType =  "Landscape";
-                } else if($type == 1){
-                    $SceneCaptureType =  "Portrait";
-                } else if($type == 1){
-                    $SceneCaptureType =  "Night scene";
-                }
-
-                $result = $result . $this->write_Table_Line("Scene capture type:",  $SceneCaptureType);
-            }        
+            // irrelevant
+            //if (@array_key_exists('SceneCaptureType', $exif_general))
+            //{
+            //    // See: http://www.awaresystems.be/imaging/tiff/tifftags/privateifd/exif/scenecapturetype.html
+            //    $SceneCaptureType = "";
+            //    $type = $exif_general['SceneCaptureType'];
+            //    if($type == 0){
+            //        $SceneCaptureType = "Standard";
+            //    } else if($type == 1){
+            //        $SceneCaptureType =  "Landscape";
+            //    } else if($type == 1){
+            //        $SceneCaptureType =  "Portrait";
+            //    } else if($type == 1){
+            //        $SceneCaptureType =  "Night scene";
+            //    }            
+            //    $tableContent = $tableContent . $this->write_Table_Line("Scene capture type:",  $SceneCaptureType);
+            //}        
 
             $exif_exif = @read_exif_data($imagePath ,'EXIF' ,0);
             if ($exif_exif !== false)
@@ -237,7 +373,7 @@ class PostAPic
                 // ISO
                 if (@array_key_exists('ISOSpeedRatings',$exif_exif))
                 {
-                    $result = $result . $this->write_Table_Line("ISO speed:",  $exif_exif['ISOSpeedRatings']);
+                    $tableContent = $tableContent . $this->write_Table_Line("ISO speed:",  $exif_exif['ISOSpeedRatings']);
                 }
             }
         }
@@ -245,12 +381,17 @@ class PostAPic
         $gpsLocation = $this->read_gps_location($imagePath);            
         if($options['addGpsLocation']){
             if($gpsLocation !== false){
-                $result = $result . $this->write_Table_Line("GPS lat:",  $gpsLocation['lat']);
-                $result = $result . $this->write_Table_Line("GPS lon:",  $gpsLocation['lng']);
+                $tableContent = $tableContent . $this->write_Table_Line("GPS lat:",  $gpsLocation['lat']);
+                $tableContent = $tableContent . $this->write_Table_Line("GPS lon:",  $gpsLocation['lng']);
             }            
         }
 
-        $result = $result . $this->write_Table_Footer();
+        if($this->tableLinesCount > 0)
+        {
+            $result = $result . $this->write_Table_Header();
+            $result = $result . $tableContent;
+            $result = $result . $this->write_Table_Footer();
+        }
 
         if($options['includeGoogleMap']){
             if($gpsLocation !== false){
@@ -293,13 +434,15 @@ class PostAPic
 
     function getCurrentOptions(){
         $defaultOptions = array(
-            'featuredImage'      => true,
-            'addGpsLocation'     => true,
-            'addCameraInfo'      => true,
-            'includeImageInPost' => true,
-            'addImageInfo'       => true,
-            'setPostDate'        => true,
-            'includeGoogleMap'   => true
+            'featuredImage'         => true,
+            'addGpsLocation'        => true,
+            'addCameraInfo'         => true,
+            'includeImageInPost'    => true,
+            'addImageInfo'          => true,
+            'setPostDate'           => true,
+            'includeGoogleMap'      => true,
+            'setXmpKeywordsAsTags'  => true,
+            'setCategory'           => ""
         );
         $options = get_option('post_a_pic_plugin_options_general', $defaultOptions);
         $options = array_merge($defaultOptions, $options);
@@ -337,6 +480,19 @@ class PostAPic
             ));
 
             set_post_thumbnail($post_id, $attachId);
+        }
+
+        if($options['setXmpKeywordsAsTags']){
+            $imagePath = get_attached_file($attachId, true);
+            $xmpKeywords = $this->getXmpKeywords($imagePath);
+            wp_set_post_tags( $post_id, $xmpKeywords, true );
+        }
+
+        $categoryOptions = trim($options['setCategory']);
+        if(! empty($categoryOptions)){
+            $categories = explode(',', $options['setCategory']);
+            $trimmedCategories = array_map('trim', $categories);
+            wp_set_object_terms( $post_id, $trimmedCategories, 'category', false);
         }
         
         return $attachId;
@@ -385,6 +541,8 @@ class PostAPic
         add_settings_field('addImageInfo', 'Add image information', array( $this,'printAddImageInfoString'), 'pluginPage', 'generalSectionId');
         add_settings_field('setPostDate', 'Set post time according to image time', array( $this,'printSetPostDateString'), 'pluginPage', 'generalSectionId');
         add_settings_field('includeGoogleMap', 'Include Google map', array( $this,'printIncludeGoogleMapString'), 'pluginPage', 'generalSectionId');
+        add_settings_field('setXmpKeywordsAsTags', 'Set XMP keywords as tags', array( $this,'printSetXmpKeywordsAsTagsString'), 'pluginPage', 'generalSectionId');
+        add_settings_field('setCategory', 'Categories', array( $this,'printSetCategoryString'), 'pluginPage', 'generalSectionId');
     }
 
     function general_section_text() {
@@ -447,6 +605,23 @@ class PostAPic
         echo " />";
     }
 
+    function printSetXmpKeywordsAsTagsString() {
+        $options = $this->getCurrentOptions();
+
+        echo "<input id='setXmpKeywordsAsTags' name='post_a_pic_plugin_options_general[setXmpKeywordsAsTags]' type='checkbox' value='1' ";
+        checked( $options['setXmpKeywordsAsTags'] );
+        echo " />";
+    }
+
+    function printSetCategoryString() {
+        $options = $this->getCurrentOptions();
+
+        echo "<input id='setCategory' name='post_a_pic_plugin_options_general[setCategory]' type='text' value='";
+        echo $options['setCategory'];
+        echo "' placeholder='Comma-separated categories' />";
+    }
+    
+
     function post_a_pic_plugin_options_general_validate($input) {
         $options = $this->getCurrentOptions();
         $options['featuredImage'] = $input['featuredImage'];
@@ -456,26 +631,28 @@ class PostAPic
         $options['addImageInfo'] = $input['addImageInfo'];
         $options['setPostDate'] = $input['setPostDate'];
         $options['includeGoogleMap'] = $input['includeGoogleMap'];
+        $options['setXmpKeywordsAsTags'] = $input['setXmpKeywordsAsTags'];
+        $options['setCategory'] = $input['setCategory'];        
         return $options;
     }
 }
 
 function post_a_pic_add_attachment($attachId){
-	try{
+	//try{
 		$pap = new PostAPic();
 		return $pap->post_a_pic($attachId);
-	}
-	catch(Exception $e)
-	{
-		// Define the settings error to display
-      add_settings_error(
-        'Error',
-        '',
-        $e->getMessage(),
-        'error'
-      );
-	}
-	return NULL;
+	//}
+	//catch(Exception $e)
+	//{
+	//	// Define the settings error to display
+    //  add_settings_error(
+    //    'Error',
+    //    '',
+    //    $e->getMessage(),
+    //    'error'
+    //  );
+	//}
+	//return NULL;
 }
 add_action('add_attachment', 'post_a_pic_add_attachment');
 
@@ -490,22 +667,3 @@ function post_a_pic_admin_add_page(){
     $pap->admin_add_page();
 }
 add_action('admin_menu', 'post_a_pic_admin_add_page');
-
-
-/*
-
-See: https://developers.google.com/maps/documentation/embed/guide
-
-
-<iframe
-  width="600"
-  height="450"
-  frameborder="0" style="border:0"
-  src="https://www.google.com/maps/embed/v1/view?key=API_KEY&center=-33.8569,151.2152&zoom=18&maptype=satellite">
-</iframe>
-
-
-https://www.google.com/maps/embed/v1/view?key=API_KEY&center=-33.8569,151.2152&zoom=18&maptype=satellite
-
-
-*/
