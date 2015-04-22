@@ -3,8 +3,8 @@ Contributors: Starnuto di topo
 Donate link: https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=8LFUW8AMENU4Y
 Tags: auto post, post, image upload
 Requires at least: 4.1.1
-Tested up to: 4.1.1
-Stable tag: 1.2
+Tested up to: 4.1.2
+Stable tag: 1.3
 License: GPLv2 or later
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
 
@@ -16,6 +16,7 @@ Provides the facility to automatically create a post when an image is uploaded t
 The uploaded image can become the post's featured image and some information about the image (such as EXIF data), or the image itself, can automatically be set in post's content.
 If the image provides its GPS coordinates, a Google map displaying its location can be added as well.
 The image's XMP keywords can be set as the post's tags and a set of categories can be associated to it too.
+The format of the generated post can be selected, if the theme in use supports it.
 Useful for photo blog or where there is a large number of image posting in a wordpress driven site.
 Originally inspired by Auto Post After Image Upload, https://wordpress.org/plugins/auto-post-after-image-upload/
 Some code sketches to handle XMP data have been excerpted from Jean-Sebastien Morisset,  http://surniaulula.com/
@@ -62,6 +63,9 @@ There is no Screenshot yet!
 * Added capability to include XMP keywords as tags
 * Added capability to set categories
 
+= 1.3 =
+* Added capability to set post format
+
 == Upgrade Notice ==
 
 = 1.1 =
@@ -71,3 +75,7 @@ There is no Screenshot yet!
 = 1.2 =
 * Enhancements
 * New functionalities (set XMP keywords as tags, set categories)
+
+= 1.3 =
+* New functionality (set post format)
+* Tested in Wordpress 4.1.2

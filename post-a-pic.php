@@ -5,7 +5,7 @@
     Plugin URI:
     Description: Provides the facility to automatically create a post when an image is uploaded to the Wordpress media gallery.
     Author: Starnuto di topo
-    Version: 1.2
+    Version: 1.3
     Author URI: 
 */
 
@@ -442,7 +442,8 @@ class PostAPic
             'setPostDate'           => true,
             'includeGoogleMap'      => true,
             'setXmpKeywordsAsTags'  => true,
-            'setCategory'           => ""
+            'setCategory'           => "",
+            'setPostFormat'         => ""
         );
         $options = get_option('post_a_pic_plugin_options_general', $defaultOptions);
         $options = array_merge($defaultOptions, $options);
@@ -494,6 +495,11 @@ class PostAPic
             $trimmedCategories = array_map('trim', $categories);
             wp_set_object_terms( $post_id, $trimmedCategories, 'category', false);
         }
+
+        $postFormat = trim($options['setPostFormat']);
+        //if(! empty($postFormat)){
+            set_post_format($post_id, $postFormat );
+        //}        
         
         return $attachId;
     }
@@ -543,6 +549,7 @@ class PostAPic
         add_settings_field('includeGoogleMap', 'Include Google map', array( $this,'printIncludeGoogleMapString'), 'pluginPage', 'generalSectionId');
         add_settings_field('setXmpKeywordsAsTags', 'Set XMP keywords as tags', array( $this,'printSetXmpKeywordsAsTagsString'), 'pluginPage', 'generalSectionId');
         add_settings_field('setCategory', 'Categories', array( $this,'printSetCategoryString'), 'pluginPage', 'generalSectionId');
+        add_settings_field('setPostFormat', 'Post format', array( $this,'printSetPostFormatString'), 'pluginPage', 'generalSectionId');        
     }
 
     function general_section_text() {
@@ -620,7 +627,27 @@ class PostAPic
         echo $options['setCategory'];
         echo "' placeholder='Comma-separated categories' />";
     }
-    
+
+    function printSetPostFormatString() {
+        $options = $this->getCurrentOptions();
+
+        if (! current_theme_supports( 'post-formats' ) ) {
+            echo "<p>Current theme does not support post formats.</p>";
+        } else {
+            $post_formats = get_theme_support( 'post-formats' );
+
+            $supportedFormats = $post_formats[0];
+            if ( is_array( $supportedFormats ) ) {
+                // Array( supported_format_1, supported_format_2 ... )
+                echo '<select name="post_a_pic_plugin_options_general[setPostFormat]">';
+                echo '<option value="" ' . selected($options['setPostFormat'], '') . ' >' . get_post_format_string('') . '</option>';
+                foreach ( $supportedFormats as $id => $value ) {
+                    echo '<option value="' . esc_attr($value) . '" ' . selected($options['setPostFormat'], $value) . '>' . get_post_format_string($value) . '</option>';
+                }
+                echo '</select>';
+            }
+        }
+    }    
 
     function post_a_pic_plugin_options_general_validate($input) {
         $options = $this->getCurrentOptions();
@@ -632,7 +659,8 @@ class PostAPic
         $options['setPostDate'] = $input['setPostDate'];
         $options['includeGoogleMap'] = $input['includeGoogleMap'];
         $options['setXmpKeywordsAsTags'] = $input['setXmpKeywordsAsTags'];
-        $options['setCategory'] = $input['setCategory'];        
+        $options['setCategory'] = $input['setCategory'];
+        $options['setPostFormat'] = $input['setPostFormat'];        
         return $options;
     }
 }
