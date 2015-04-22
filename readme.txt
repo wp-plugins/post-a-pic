@@ -3,8 +3,8 @@ Contributors: Starnuto di topo
 Donate link: https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=8LFUW8AMENU4Y
 Tags: auto post, post, image upload
 Requires at least: 4.1.1
-Tested up to: 4.1.1
-Stable tag: 1.0
+Tested up to: 4.1.2
+Stable tag: 1.3
 License: GPLv2 or later
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
 
@@ -13,9 +13,14 @@ Let you create single/bulk post after uploading any media from wordpress media g
 == Description ==
 
 Provides the facility to automatically create a post when an image is uploaded to the Wordpress media gallery.
-The uploaded image can becomes the post's feature image and some information about the image (such as EXIF data), or the image itself, can automatically be set in post's content.
+The uploaded image can become the post's featured image and some information about the image (such as EXIF data), or the image itself, can automatically be set in post's content.
+If the image provides its GPS coordinates, a Google map displaying its location can be added as well.
+The image's XMP keywords can be set as the post's tags and a set of categories can be associated to it too.
+The format of the generated post can be selected, if the theme in use supports it.
 Useful for photo blog or where there is a large number of image posting in a wordpress driven site.
-Inspired by Auto Post After Image Upload, https://wordpress.org/plugins/auto-post-after-image-upload/
+Originally inspired by Auto Post After Image Upload, https://wordpress.org/plugins/auto-post-after-image-upload/
+Some code sketches to handle XMP data have been excerpted from Jean-Sebastien Morisset,  http://surniaulula.com/
+More credits are reported inside the code.
 
 Project BitBucket URL: [http://bitbucket.org/starnutoditopo/post-a-pic/](http://bitbucket.org/starnutoditopo/post-a-pic/)
 
@@ -36,7 +41,7 @@ To **Install** this plugin there is no any complexity. It's very simple like oth
 
 = This is useful for creating bulk post? =
 
-Yes, of course. The main intention to create this plugin to use where user need bulk image posting and creating post.
+Yes, it is. The main intention to create this plugin to use where user need bulk image posting and creating post.
 
 == Screenshots ==
 
@@ -46,3 +51,31 @@ There is no Screenshot yet!
 
 = 1.0 =
 * Initial release
+
+= 1.1 =
+* Bug fixes in case of missing GPS coordinates
+* Showing properties in a table
+* Added capability to display Google map
+
+= 1.2 =
+* Bug fixes in case of missing image meta data
+* Removed some irrelevant information
+* Added capability to include XMP keywords as tags
+* Added capability to set categories
+
+= 1.3 =
+* Added capability to set post format
+
+== Upgrade Notice ==
+
+= 1.1 =
+* Bug fixes in case of missing GPS coordinates
+* Enhancements
+
+= 1.2 =
+* Enhancements
+* New functionalities (set XMP keywords as tags, set categories)
+
+= 1.3 =
+* New functionality (set post format)
+* Tested in Wordpress 4.1.2
